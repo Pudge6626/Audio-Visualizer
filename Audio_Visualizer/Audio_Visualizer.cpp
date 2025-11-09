@@ -8,27 +8,35 @@
 static SDL_Window* window = NULL; 
 static SDL_Renderer* renderer = NULL; 
 
-#define windowWidth 640
-#define windowHeight 480
-#define squareLength 25
+#define windowWidth 500
+#define windowHeight 500
+#define squareLength 20
 #define amplitude 10; 
 
 using namespace std; 
 
 
-void drawBar(SDL_Renderer* renderer, int sideLength, int arr[]) {
-	int barNum = sizeof(arr) / sizeof(*arr); 
+//draws out the bars (audio visualization) of an array of amplitudes
+void drawBar(SDL_Renderer* renderer, int sideLength, int arr[], int size) {
+	//spacing size between squares
+	int s = 10; 
+	//gets number of bars to draw 
+	int barNum = size;
+	//starts by examining each bar
 	for (int i = 0; i < barNum; i++) {
+		//creates list of squares corresponding to amplitude of one bar
 		SDL_FRect* rects = (SDL_FRect*)malloc(arr[i] * sizeof(SDL_FRect));
+		//sets structure parameters for squares
 		for (int j = 0; j < arr[i]; j++) {
 			rects[j].w = sideLength;
 			rects[j].h = sideLength;
-			rects[j].x = (50 * i);
-			rects[j].y = (50 * j);
-
+			rects[j].x = (i + 1) * (s) + (i * sideLength); 
+			rects[j].y = windowHeight - ((j + 1) * (sideLength + s)); 
+			SDL_RenderFillRect(renderer, &rects[j]); 
 		}
-		SDL_RenderFillRects(renderer, rects, arr[i]);
-		free(rects);
+		//renderers squares
+		//SDL_RenderFillRects(renderer, rects, arr[i]);
+		free(rects); //dynamic array; new array for each bar
 	}
 	//SDL_RenderPresent(renderer); 
 }
@@ -81,41 +89,19 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
 	
    // Continuous iteration, this test code draws a simple blue square 
    SDL_AppResult SDL_AppIterate(void* appstate) {
-		SDL_FRect rectangle, test;  
 		SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE); 
 		SDL_RenderClear(renderer); //draws black background using renderer, repeats for every new drawing
 
-		//creates a 50x50 square at position (400,50) 
-		rectangle.w = 50; 
-		rectangle.h = 50; 
-		rectangle.x = 400; 
-		rectangle.y = 50; //top of rectangle is this many pixels from top of the screen
-/*
-		test.w = 50;  
-		test.h = 50; 
-		test.x = 50; 
-		test.y = 50; 
 
-		*/ 
-
-		SDL_SetRenderDrawColor(renderer, 0, 0, 255, SDL_ALPHA_OPAQUE); 
-		SDL_RenderFillRect(renderer, &rectangle); 
-		int arr[] = { 3,2,1 }; 
-		int sideLength = 25; 
-		int barNum = sizeof(arr) / sizeof(*arr);
-
-		drawBar(renderer, 10, arr); 
-
-
-		
-		//SDL_RenderPresent(renderer);
-		
-		
-		//bool b = SDL_RenderFillRect(renderer, &test); 
-		//printf("%i\n", b); 
-
-		//draws a solid blue rectangle
-		SDL_RenderPresent(renderer); 
+		SDL_SetRenderDrawColor(renderer, 0, 0, 255, SDL_ALPHA_OPAQUE);  
+		//test array
+		int arr[] = { 3,2,4,5,2,1,1 }; 
+		//calculate size before hand to avoid pointer arithmatic problems
+		int size = sizeof(arr) / sizeof(*arr); 
+		drawBar(renderer, squareLength, arr, size); 
+		//note: can render within a function then present outside the function 
+		SDL_RenderPresent(renderer);
+		 
 		return SDL_APP_CONTINUE; 
 	}
 
