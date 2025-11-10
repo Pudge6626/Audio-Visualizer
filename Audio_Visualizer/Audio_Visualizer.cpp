@@ -2,16 +2,18 @@
 #include <SDL3/SDL.h>
 #include<SDL3/SDL_main.h>
 #include <iostream>
-#include <vector>
+#include <cmath>
+#include <windows.h>
+#include <fftw3.h>
 
 //create window and renderer pointers, these handle their respective tasks
 static SDL_Window* window = NULL; 
 static SDL_Renderer* renderer = NULL; 
 
-#define windowWidth 500
 #define windowHeight 500
 #define squareLength 20
 #define amplitude 10; 
+ 
 
 using namespace std; 
 
@@ -19,9 +21,13 @@ using namespace std;
 //draws out the bars (audio visualization) of an array of amplitudes
 void drawBar(SDL_Renderer* renderer, int sideLength, int arr[], int size) {
 	//spacing size between squares
-	int s = 10; 
+	int s = sideLength / 2; 
 	//gets number of bars to draw 
 	int barNum = size;
+	//total length of bars including spacing size
+	int L = (barNum * sideLength) + ((barNum - 1) * s); 
+	//space from beginning bar and end bar to the edge of the window, used for centering
+	int r = round((windowHeight -  L) / 2.0); 
 	//starts by examining each bar
 	for (int i = 0; i < barNum; i++) {
 		//creates list of squares corresponding to amplitude of one bar
@@ -30,15 +36,13 @@ void drawBar(SDL_Renderer* renderer, int sideLength, int arr[], int size) {
 		for (int j = 0; j < arr[i]; j++) {
 			rects[j].w = sideLength;
 			rects[j].h = sideLength;
-			rects[j].x = (i + 1) * (s) + (i * sideLength); 
+			rects[j].x = r + (i * (sideLength + s)); //centers the bars
 			rects[j].y = windowHeight - ((j + 1) * (sideLength + s)); 
-			SDL_RenderFillRect(renderer, &rects[j]); 
 		}
 		//renderers squares
-		//SDL_RenderFillRects(renderer, rects, arr[i]);
+		SDL_RenderFillRects(renderer, rects, arr[i]);
 		free(rects); //dynamic array; new array for each bar
-	}
-	//SDL_RenderPresent(renderer); 
+	} 
 }
 
 
@@ -58,7 +62,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
 	}
 
 	//is the window or referer fails to be created, throw an error
-	if (!SDL_CreateWindowAndRenderer("title", windowWidth, windowHeight, SDL_WINDOW_RESIZABLE, &window, &renderer)) {
+	if (!SDL_CreateWindowAndRenderer("Audio Visualizer", windowHeight, windowHeight, SDL_WINDOW_RESIZABLE, &window, &renderer)) {
 		SDL_Log("Coulnt Create Window or Renderer: %s", SDL_GetError()); 
 
 		return SDL_APP_FAILURE; 
@@ -66,7 +70,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
 	}
 
 	//sets render parameters when it comes to the resizing of the window 
-	SDL_SetRenderLogicalPresentation(renderer, windowWidth, windowHeight, SDL_LOGICAL_PRESENTATION_LETTERBOX); 
+	SDL_SetRenderLogicalPresentation(renderer, windowHeight, windowHeight, SDL_LOGICAL_PRESENTATION_LETTERBOX); 
 	cout << "success\n"; 
 	return SDL_APP_CONTINUE; 
 
@@ -91,17 +95,21 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
    SDL_AppResult SDL_AppIterate(void* appstate) {
 		SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE); 
 		SDL_RenderClear(renderer); //draws black background using renderer, repeats for every new drawing
-
+	
 
 		SDL_SetRenderDrawColor(renderer, 0, 0, 255, SDL_ALPHA_OPAQUE);  
 		//test array
-		int arr[] = { 3,2,4,5,2,1,1 }; 
+		int randArray[10]; 
+		for (int i = 0; i < 10; i++) {
+			randArray[i] = rand() % 11; 
+		}
+		
 		//calculate size before hand to avoid pointer arithmatic problems
-		int size = sizeof(arr) / sizeof(*arr); 
-		drawBar(renderer, squareLength, arr, size); 
+		int size = sizeof(randArray) / sizeof(*randArray); 
+		drawBar(renderer, squareLength, randArray, size); 
 		//note: can render within a function then present outside the function 
 		SDL_RenderPresent(renderer);
-		 
+		Sleep(100); 
 		return SDL_APP_CONTINUE; 
 	}
 
