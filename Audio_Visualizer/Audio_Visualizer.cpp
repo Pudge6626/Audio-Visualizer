@@ -8,14 +8,32 @@
 
 //create window and renderer pointers, these handle their respective tasks
 static SDL_Window* window = NULL; 
-static SDL_Renderer* renderer = NULL; 
+static SDL_Renderer* renderer = NULL;
 
 #define windowHeight 500
 #define squareLength 20
-#define amplitude 10; 
- 
+#define amplitude 10
+#define N 8 
+#define REAL 0
+#define IMAGINARY 1
+
 
 using namespace std; 
+
+fftw_complex* in, * out; //global input and output arrays
+fftw_plan p; //global plan for FFT 
+
+
+
+void copyArray(fftw_complex* x, int* y) {
+	for (int i = 0; i < N; i++) {
+		x[i][REAL] = y[i]; 
+
+	}
+
+
+}
+
 
 
 //draws out the bars (audio visualization) of an array of amplitudes
@@ -72,6 +90,13 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
 	//sets render parameters when it comes to the resizing of the window 
 	SDL_SetRenderLogicalPresentation(renderer, windowHeight, windowHeight, SDL_LOGICAL_PRESENTATION_LETTERBOX); 
 	cout << "success\n"; 
+	
+	//memory allocation of input and output arrays 
+	in = (fftw_complex*)fftw_malloc(N * sizeof(fftw_complex)); 
+	out = (fftw_complex*)fftw_malloc(N * sizeof(fftw_complex)); 
+	//optimized plan of exectution for my specific hardware, runs once
+	p = fftw_plan_dft_1d(N, in, out, FFTW_FORWARD, FFTW_MEASURE); 
+ 
 	return SDL_APP_CONTINUE; 
 
 }
@@ -82,6 +107,21 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
 
 	if (event->type == SDL_EVENT_QUIT) {
 
+		cout << "In: "; 
+		for (int i = 0; i < N; i++) {
+			printf("%d, ", (int)in[i][REAL]); 
+
+		}
+
+		cout << "\nOut: "; 
+		
+		for (int i = 0; i < N; i++) {
+			printf("%d, ", (int)out[i][REAL]); 
+		}
+
+		fftw_destroy_plan(p); 
+		fftw_free(in);  
+		fftw_free(out);  
 		return SDL_APP_SUCCESS;
 	}
 
@@ -99,11 +139,15 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
 
 		SDL_SetRenderDrawColor(renderer, 0, 0, 255, SDL_ALPHA_OPAQUE);  
 		//test array
-		int randArray[10]; 
-		for (int i = 0; i < 10; i++) {
-			randArray[i] = rand() % 11; 
+		int randArray[8]; 
+		for (int i = 0; i < 8; i++) {
+			randArray[i] = (rand() % 8) + 1; 
 		}
 		
+		copyArray(in, randArray); 
+		fftw_execute(p); 
+
+
 		//calculate size before hand to avoid pointer arithmatic problems
 		int size = sizeof(randArray) / sizeof(*randArray); 
 		drawBar(renderer, squareLength, randArray, size); 
