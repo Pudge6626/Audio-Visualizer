@@ -12,7 +12,7 @@ static SDL_Renderer* renderer = NULL;
 
 #define windowHeight 500
 #define squareLength 20
-#define amplitude 10
+#define amplitude 8
 #define N 8 
 #define REAL 0
 #define IMAGINARY 1
@@ -25,7 +25,7 @@ fftw_plan p; //global plan for FFT
 
 
 
-void copyArray(fftw_complex* x, int* y) {
+void copyToInput(fftw_complex* x, int* y) {
 	for (int i = 0; i < N; i++) {
 		x[i][REAL] = y[i]; 
 
@@ -34,6 +34,22 @@ void copyArray(fftw_complex* x, int* y) {
 
 }
 
+
+void copyToDraw(int* x, fftw_complex* y) {
+	for (int i = 0; i < N; i++) {
+		if (y[i][REAL] < 0) {
+			x[i] = 0; 
+			continue; 
+		}
+		if (y[i][REAL] > amplitude) {
+			x[i] = amplitude; 
+			continue; 
+		}
+		x[i] = y[i][REAL]; 
+
+	}
+
+}
 
 
 //draws out the bars (audio visualization) of an array of amplitudes
@@ -140,17 +156,19 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
 		SDL_SetRenderDrawColor(renderer, 0, 0, 255, SDL_ALPHA_OPAQUE);  
 		//test array
 		int randArray[8]; 
+		int drawArray[8]; 
 		for (int i = 0; i < 8; i++) {
-			randArray[i] = (rand() % 8) + 1; 
+			randArray[i] = (rand() % amplitude) + 1; 
 		}
 		
-		copyArray(in, randArray); 
+		//puts random array into the input array for fft
+		copyToInput(in, randArray); 
+		//performs fft
 		fftw_execute(p); 
-
-
-		//calculate size before hand to avoid pointer arithmatic problems
-		int size = sizeof(randArray) / sizeof(*randArray); 
-		drawBar(renderer, squareLength, randArray, size); 
+		//transfers output array into a 1d array, also limits its values from 0 to amplitude 
+		copyToDraw(drawArray, out);  
+		//draws limited fft output
+		drawBar(renderer, squareLength, drawArray, N); 
 		//note: can render within a function then present outside the function 
 		SDL_RenderPresent(renderer);
 		Sleep(100); 
