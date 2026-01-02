@@ -5,6 +5,10 @@
 #include <cmath>
 #include <windows.h>
 #include <fftw3.h>
+#include <vector>
+#include <mmdeviceapi.h>
+#include <audioclient.h>
+#include <cassert>
 
 //create window and renderer pointers, these handle their respective tasks
 static SDL_Window* window = NULL; 
@@ -16,6 +20,8 @@ static SDL_Renderer* renderer = NULL;
 #define N 8 
 #define REAL 0
 #define IMAGINARY 1
+#define REFTIME_REQUESTED 1000000
+#define SAFE_RELEASE(punk) if ((punk) != NULL) {(punk)->Release(); (punk) = NULL;}
 
 
 using namespace std; 
@@ -23,6 +29,28 @@ using namespace std;
 fftw_complex* in, * out; //global input and output arrays
 fftw_plan p; //global plan for FFT 
 
+// sets these variables equal to the GUID representation of these interfaces/classes
+const CLSID CLSID_MMDeviceEnumerator = __uuidof(MMDeviceEnumerator);
+const IID IID_IMMDeviceEnumerator = __uuidof(IMMDeviceEnumerator);
+const IID IID_IAudioClient = __uuidof(IAudioClient);
+const IID IID_IAudioCaptureClient = __uuidof(IAudioCaptureClient);
+
+
+HRESULT hr;
+REFERENCE_TIME hnsRequestedDuration = REFTIME_REQUESTED;
+REFERENCE_TIME hnsActualDuration;
+UINT32 bufferFrameCount;
+UINT32 numFramesAvailable;
+IMMDeviceEnumerator* pEnumerator = NULL;
+IMMDevice* pDevice = NULL;
+IAudioClient* pAudioClient = NULL;
+IAudioCaptureClient* pCaptureClient = NULL;
+WAVEFORMATEX* pwfx = NULL;
+UINT32 packetLength = 0;
+BOOL bDone = NULL;
+BYTE* pData;
+DWORD flags;
+vector<float> myData = {};
 
 
 void copyToInput(fftw_complex* x, int* y) {
@@ -39,14 +67,16 @@ void copyToDraw(int* x, fftw_complex* y) {
 	for (int i = 0; i < N; i++) {
 		if (y[i][REAL] < 0) {
 			x[i] = 0; 
-			continue; 
+			 
 		}
-		if (y[i][REAL] > amplitude) {
+		else if (y[i][REAL] > amplitude) {
 			x[i] = amplitude; 
-			continue; 
+			
 		}
-		x[i] = y[i][REAL]; 
-
+		
+		else {
+			x[i] = sqrt(pow(y[i][REAL], 2) + pow(y[i][IMAGINARY], 2));
+		}
 	}
 
 }
@@ -95,6 +125,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
 
 	}
 
+
 	//is the window or referer fails to be created, throw an error
 	if (!SDL_CreateWindowAndRenderer("Audio Visualizer", windowHeight, windowHeight, SDL_WINDOW_RESIZABLE, &window, &renderer)) {
 		SDL_Log("Coulnt Create Window or Renderer: %s", SDL_GetError()); 
@@ -113,6 +144,37 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
 	//optimized plan of exectution for my specific hardware, runs once
 	p = fftw_plan_dft_1d(N, in, out, FFTW_FORWARD, FFTW_MEASURE); 
  
+	//creates single instance of device enumerator
+	hr = CoCreateInstance(CLSID_MMDeviceEnumerator, NULL, CLSCTX_ALL, IID_IMMDeviceEnumerator, (void**)&pEnumerator);
+	assert(SUCCEEDED(hr));
+
+	//writes address of default capture audio endpoint to pDevice pointer
+	hr = pEnumerator->GetDefaultAudioEndpoint(eRender, eConsole, &pDevice);
+	assert(SUCCEEDED(hr));
+
+	//uses device interface function to create audio client
+	hr = pDevice->Activate(IID_IAudioClient, CLSCTX_ALL, NULL, (void**)&pAudioClient);
+	assert(SUCCEEDED(hr));
+
+	//gets format of audio stream
+	hr = pAudioClient->GetMixFormat(&pwfx);
+	assert(SUCCEEDED(hr));
+
+	//initializes audio stream 
+	hr = pAudioClient->Initialize(AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_LOOPBACK, hnsRequestedDuration, 0, pwfx, NULL);
+	assert(SUCCEEDED(hr));
+
+	//gets size of allocated buffer, useful for calculations
+	hr = pAudioClient->GetBufferSize(&bufferFrameCount);
+	assert(SUCCEEDED(hr));
+
+	//expands functionality of audio client
+	hr = pAudioClient->GetService(IID_IAudioCaptureClient, (void**)&pCaptureClient);
+	assert(SUCCEEDED(hr));
+
+	//computes the length of the buffer in terms of time units
+	hnsActualDuration = (double) REFTIME_REQUESTED * bufferFrameCount / pwfx->nSamplesPerSec;
+
 	return SDL_APP_CONTINUE; 
 
 }
@@ -138,6 +200,13 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
 		fftw_destroy_plan(p); 
 		fftw_free(in);  
 		fftw_free(out);  
+		CoTaskMemFree(pwfx); 
+		SAFE_RELEASE(pEnumerator); 
+		SAFE_RELEASE(pDevice); 
+		SAFE_RELEASE(pAudioClient); 
+		SAFE_RELEASE(pCaptureClient); 
+
+
 		return SDL_APP_SUCCESS;
 	}
 
@@ -151,9 +220,8 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
    SDL_AppResult SDL_AppIterate(void* appstate) {
 		SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE); 
 		SDL_RenderClear(renderer); //draws black background using renderer, repeats for every new drawing
-	
-
-		SDL_SetRenderDrawColor(renderer, 0, 0, 255, SDL_ALPHA_OPAQUE);  
+		SDL_SetRenderDrawColor(renderer, 255, 0, 0, SDL_ALPHA_OPAQUE);  
+		
 		//test array
 		int randArray[8]; 
 		int drawArray[8]; 
