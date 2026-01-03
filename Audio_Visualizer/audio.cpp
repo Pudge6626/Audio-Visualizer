@@ -1,9 +1,7 @@
-#include <cassert>
-#include<mmdeviceapi.h>
-#include<audioclient.h>
-#include<synchapi.h>
-#include<vector>
+#include "audio.h"
 
+
+#define SAFE_RELEASE(punk) if ((punk) != NULL) {(punk)->Release(); (punk) = NULL;}
 
 // sets these variables equal to the GUID representation of these interfaces/classes
 const CLSID CLSID_MMDeviceEnumerator = __uuidof(MMDeviceEnumerator);
@@ -22,6 +20,7 @@ WAVEFORMATEX* pwfx = NULL;
 UINT32 packetLength = 0;
 BYTE* pData; 
 DWORD flags;
+
 
 
 //initializes loopback stream of requested size in time units 
@@ -78,6 +77,8 @@ void recordAudio(DWORD sleep_time_ms, std::vector<float> &audio_data) {
 		hr = pCaptureClient->GetBuffer(&pData, &numFramesAvailable, &flags, NULL, NULL);
 		assert(SUCCEEDED(hr));
 
+		
+
 		//reinterpret BYTEs as 32 bit floats 
 		float* float_data = (float*)pData;
 
@@ -107,10 +108,26 @@ void recordAudio(DWORD sleep_time_ms, std::vector<float> &audio_data) {
 
 		}
 
+		//release packet so that it may extract more data from the buffer
+		hr = pCaptureClient->ReleaseBuffer(numFramesAvailable);
+		assert(SUCCEEDED(hr));
+
+		//get new packet length of the data the packet retrieved 
+		hr = pCaptureClient->GetNextPacketSize(&packetLength);
+		assert(SUCCEEDED(hr));
 
 	}
 
 
+}
+
+void destroyAudio() {
+
+	CoTaskMemFree(pwfx); 
+	SAFE_RELEASE(pEnumerator); 
+	SAFE_RELEASE(pDevice); 
+	SAFE_RELEASE(pAudioClient); 
+	SAFE_RELEASE(pCaptureClient); 
 
 
 }

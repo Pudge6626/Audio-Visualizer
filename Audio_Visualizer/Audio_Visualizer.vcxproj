@@ -135,6 +135,11 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="visualizer.cpp" />
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="audio.h" />
+    <ClInclude Include="fft.h" />
+    <ClInclude Include="visualizer.h" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
