@@ -1,3 +1,15 @@
+/*
+whole thing is fucked up, im just going to create audio file, fft file, and visualizer file. 
+Audio file just records it into a vector, then the fft file will pass it through a fourier transform. 
+The visualizer file needs to be able to bin average, amplitude average, and draw to the screen. 
+Audio file initializes and records, thats it. Init and recordAudio. fft should just be an fft function, something simple. 
+it takes as an input the vector of data, outputs to a 1d array, and also takes size as an input just to simplify things. 
+*/
+
+
+
+
+
 #define SDL_MAIN_USE_CALLBACKS  1; 
 #include <SDL3/SDL.h>
 #include<SDL3/SDL_main.h>
