@@ -17,10 +17,11 @@ static SDL_Renderer* renderer = NULL;
 #define windowHeight 500
 #define squareLength 20
 #define amplitude 8
-#define N 8 
+#define N 2048  //2^11
 #define REAL 0
 #define IMAGINARY 1
-#define REFTIME_REQUESTED 1000000
+#define REFTIME_REQUESTED 1000000 //100 ms
+#define SLEEP_TIME_MS 30 
 #define SAFE_RELEASE(punk) if ((punk) != NULL) {(punk)->Release(); (punk) = NULL;}
 
 
@@ -28,6 +29,8 @@ using namespace std;
 
 fftw_complex* in, * out; //global input and output arrays
 fftw_plan p; //global plan for FFT 
+float* drawArr; 
+int bin_8[8]; 
 
 // sets these variables equal to the GUID representation of these interfaces/classes
 const CLSID CLSID_MMDeviceEnumerator = __uuidof(MMDeviceEnumerator);
@@ -53,9 +56,10 @@ DWORD flags;
 vector<float> myData = {};
 
 
-void copyToInput(fftw_complex* x, int* y) {
-	for (int i = 0; i < N; i++) {
-		x[i][REAL] = y[i]; 
+void copyToInput(fftw_complex * x, vector<float> y, size_t l) { 
+	
+	for (int i = 0; i < l; i++) {
+		x[i][REAL] = y.at(i); 
 
 	}
 
@@ -63,21 +67,25 @@ void copyToInput(fftw_complex* x, int* y) {
 }
 
 
-void copyToDraw(int* x, fftw_complex* y) {
-	for (int i = 0; i < N; i++) {
-		if (y[i][REAL] < 0) {
-			x[i] = 0; 
-			 
-		}
-		else if (y[i][REAL] > amplitude) {
-			x[i] = amplitude; 
-			
-		}
-		
-		else {
-			x[i] = sqrt(pow(y[i][REAL], 2) + pow(y[i][IMAGINARY], 2));
-		}
+void copyToDraw(float* x, fftw_complex* y, size_t n) {
+	x = (float*)malloc(n * sizeof(float)); 
+	for (int i = 0; i < n; i++) {
+		x[i] = y[i][REAL];
 	}
+
+}
+
+void bin_8_avg(int* bin, float* data, size_t n) {
+	int l = n / 8; 
+	float avg = 0; 
+	for (int i = 0; i < 8; i++) {
+		for (int j = i * l; j < (i + 1) * l; j++) {
+			avg += data[j]; 
+		}
+		bin[i] = round(avg / n); 
+		avg = 0; 
+	}
+
 
 }
 
@@ -118,6 +126,8 @@ void drawBar(SDL_Renderer* renderer, int sideLength, int arr[], int size) {
 //callback initialization of SDL
 SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
 
+	hr = CoInitializeEx(NULL, COINIT_MULTITHREADED); 
+	assert(SUCCEEDED(hr)); 
 	//if sdl cant initialize we log the problem and return a failure to halt the callback
 	if (!SDL_INIT_VIDEO) {
 		SDL_Log("Couldnt Initialilze SDL: %s", SDL_GetError()); 
@@ -138,12 +148,8 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
 	SDL_SetRenderLogicalPresentation(renderer, windowHeight, windowHeight, SDL_LOGICAL_PRESENTATION_LETTERBOX); 
 	cout << "success\n"; 
 	
-	//memory allocation of input and output arrays 
-	in = (fftw_complex*)fftw_malloc(N * sizeof(fftw_complex)); 
-	out = (fftw_complex*)fftw_malloc(N * sizeof(fftw_complex)); 
-	//optimized plan of exectution for my specific hardware, runs once
-	p = fftw_plan_dft_1d(N, in, out, FFTW_FORWARD, FFTW_MEASURE); 
- 
+
+	
 	//creates single instance of device enumerator
 	hr = CoCreateInstance(CLSID_MMDeviceEnumerator, NULL, CLSCTX_ALL, IID_IMMDeviceEnumerator, (void**)&pEnumerator);
 	assert(SUCCEEDED(hr));
@@ -172,9 +178,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
 	hr = pAudioClient->GetService(IID_IAudioCaptureClient, (void**)&pCaptureClient);
 	assert(SUCCEEDED(hr));
 
-	//computes the length of the buffer in terms of time units
-	hnsActualDuration = (double) REFTIME_REQUESTED * bufferFrameCount / pwfx->nSamplesPerSec;
-
+	
 	return SDL_APP_CONTINUE; 
 
 }
@@ -222,24 +226,81 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
 		SDL_RenderClear(renderer); //draws black background using renderer, repeats for every new drawing
 		SDL_SetRenderDrawColor(renderer, 255, 0, 0, SDL_ALPHA_OPAQUE);  
 		
-		//test array
-		int randArray[8]; 
-		int drawArray[8]; 
-		for (int i = 0; i < 8; i++) {
-			randArray[i] = (rand() % amplitude) + 1; 
-		}
+		//start recording, will fill up buffer
+		hr = pAudioClient->Start();
+		assert(SUCCEEDED(hr));
+
+		//sleep for defined length; 30ms
+		Sleep(SLEEP_TIME_MS);
+
+		//stop recording
+		hr = pAudioClient->Stop();
+		assert(SUCCEEDED(hr));
 		
-		//puts random array into the input array for fft
-		copyToInput(in, randArray); 
+		//get initial size of packet 
+		hr = pCaptureClient->GetNextPacketSize(&packetLength); 
+		assert(SUCCEEDED(hr)); 
+
+
+		while (packetLength != 0) {
+
+			//retrieve packet and store it in pData
+			hr = pCaptureClient->GetBuffer(&pData, &numFramesAvailable, &flags, NULL, NULL);
+			assert(SUCCEEDED(hr));
+
+			//reinterprets BYTE array as float array
+			float* float_data = (float*)pData; 
+
+			//compute number of floats stored in pData
+			int float_length = (pwfx->nChannels * pwfx->wBitsPerSample * numFramesAvailable) / 32; 
+
+			//if silent audio record zeros, one channel 
+			if (flags & AUDCLNT_BUFFERFLAGS_SILENT) {
+
+				for (int i = 0; i < float_length; i += 2) {
+
+					myData.push_back(0); 
+				}
+
+			}
+
+			else {
+
+				for (int i = 0; i < float_length; i += 2)  {
+
+					//store in myData the average of the two channels
+					myData.push_back((*(float_data + i) + *(float_data + i + 1)) / 2.);
+
+				}
+
+			}
+
+		}
+
+		int size = myData.size();  
+
+		in = (fftw_complex*)fftw_malloc(size * sizeof(fftw_complex)); 
+		out = (fftw_complex*)fftw_malloc(size * sizeof(fftw_complex)); 
+		//quickly made computation plan
+		p = fftw_plan_dft_1d(size, in, out, FFTW_FORWARD, FFTW_ESTIMATE); 
+
+
+		//copy vector data to input for FFT
+		copyToInput(in, myData, size); 
+
 		//performs fft
 		fftw_execute(p); 
-		//transfers output array into a 1d array, also limits its values from 0 to amplitude 
-		copyToDraw(drawArray, out);  
+		
+		//copies the non-junk FFT output 
+		copyToDraw(drawArr, out, size); 
+
+		//averages out drawArr into 8 bins for a size 8 array
+		bin_8_avg(bin_8, drawArr, size); 
+
 		//draws limited fft output
-		drawBar(renderer, squareLength, drawArray, N); 
+		drawBar(renderer, squareLength, bin_8, amplitude); 
 		//note: can render within a function then present outside the function 
 		SDL_RenderPresent(renderer);
-		Sleep(100); 
 		return SDL_APP_CONTINUE; 
 	}
 
