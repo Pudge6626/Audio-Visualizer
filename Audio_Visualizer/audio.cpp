@@ -26,6 +26,8 @@ DWORD flags;
 //initializes loopback stream of requested size in time units 
 void initLoopback(REFERENCE_TIME hnsRequestedDuration) {
 
+	 
+
 	//initialize COM library
 	hr = CoInitializeEx(NULL, COINIT_MULTITHREADED); 
 	assert(SUCCEEDED(hr)); 
@@ -85,28 +87,24 @@ void recordAudio(DWORD sleep_time_ms, std::vector<float> &audio_data) {
 		//number of floats float_data points to
 		int float_length = (pwfx->nChannels * pwfx->wBitsPerSample * numFramesAvailable) / 32; 
 
-		//if there is silence record 1 channel of zeros
+		//if there is silence empty the audio vector
 		if (flags & AUDCLNT_BUFFERFLAGS_SILENT) {
 
-			for (int i = 0; i < float_length; i += 2) {
+			audio_data.clear(); 
 
-				audio_data.push_back(0);
-
-			
-			}
 
 		}
 
-		//otherwise average the two channels
+		//if not silent average out the 2 channel audio data 
 		else {
-
+			
 			for (int i = 0; i < float_length; i += 2) {
 
-				audio_data.push_back((*(float_data + i) + *(float_data + i + 1)) / 2.);
-
+				//audio_data.push_back((*(float_data + i) + *(float_data + i + 1)) / 2.);
+				audio_data.push_back(*(float_data + i)); 
 			}
 
-		}
+		} 
 
 		//release packet so that it may extract more data from the buffer
 		hr = pCaptureClient->ReleaseBuffer(numFramesAvailable);
