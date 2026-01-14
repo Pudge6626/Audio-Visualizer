@@ -4,7 +4,7 @@
 #include <iostream>
 
 //20ms of buffer
-#define REQUESTED_DURATION 200000 
+#define REQUESTED_DURATION 1000000 
 
 //will record 10ms of audio
 #define SLEEP_TIME_MS 10
@@ -25,26 +25,27 @@ int main() {
 	int c = 0;
 
 	while (state) {
-
+		
 		recordAudio(SLEEP_TIME_MS, myAudio);
 		size_t size = myAudio.size();
 
 		if (size != 0) {
 			freqSpectrum = (float*)malloc(size * sizeof(float));
 			fft(myAudio, freqSpectrum, size);
+			//std::cout << "freqSpectrum[0]: " << freqSpectrum[0] << "\n"; 
 			visualizeFFT(2, freqSpectrum, size);
 			myAudio.clear();
 			free(freqSpectrum);
 
 		}
 
-		//std::cout << "size: " << size << "\n"; 
+		
 		visualizerExit(state);
-		Sleep(5); 
+		
 
 	
 	}
-
+	 
 	destroyAudio(); 
 	return 0; 
 } 

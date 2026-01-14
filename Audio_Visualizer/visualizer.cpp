@@ -130,9 +130,9 @@ void visualizeFFT(int sideLength, float data[], size_t size) {
 	for (int i = 0; i < size; i++) {
 
 		bars[i].x = remainder + i * (sideLength + space); 
-		bars[i].y = window_height - (data[i] * 10); 
+		bars[i].y = window_height - (data[i] * 100); 
 		bars[i].w = sideLength; 
-		bars[i].h = data[i] * 10; 
+		bars[i].h = data[i] * 100; 
 	}
 
 	SDL_RenderFillRects(renderer, bars, size); 

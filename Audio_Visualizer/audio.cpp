@@ -60,6 +60,7 @@ void initLoopback(REFERENCE_TIME hnsRequestedDuration) {
 void recordAudio(DWORD sleep_time_ms, std::vector<float> &audio_data) {
 
 	//start recording for sleep_time_ms long
+	//Sleep(20); 
 	hr = pAudioClient->Start(); 
 	assert(SUCCEEDED(hr)); 
 
@@ -100,8 +101,8 @@ void recordAudio(DWORD sleep_time_ms, std::vector<float> &audio_data) {
 			
 			for (int i = 0; i < float_length; i += 2) {
 
-				//audio_data.push_back((*(float_data + i) + *(float_data + i + 1)) / 2.);
-				audio_data.push_back(*(float_data + i)); 
+				audio_data.push_back((*(float_data + i) + *(float_data + i + 1)) / 2.);
+				//audio_data.push_back(*(float_data + i)); 
 			}
 
 		} 
@@ -115,8 +116,8 @@ void recordAudio(DWORD sleep_time_ms, std::vector<float> &audio_data) {
 		assert(SUCCEEDED(hr));
 
 	}
-
-
+	/*hr = pAudioClient->Reset(); 
+	assert(SUCCEEDED(hr)); */
 }
 
 void destroyAudio() {
