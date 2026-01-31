@@ -30,7 +30,7 @@ void fft(std::vector<float> input, float output[], int n) {
 
 	for (int i = 0; i < n; i++) {
 		//float temp = sqrt(pow(out[i][REAL], 2) + pow(out[i][IMAGINARY], 2)); 
-		float temp = sqrt(out[i][REAL] * out[i][REAL] + out[i][IMAGINARY] * out[i][IMAGINARY]) / n;
+		float temp = sqrt(out[i][REAL] * out[i][REAL] + out[i][IMAGINARY] * out[i][IMAGINARY]);
 	
 
 		assert(std::isfinite(temp)); 
